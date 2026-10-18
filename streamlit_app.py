@@ -174,52 +174,119 @@ with tab3:
 # 4. Data Entry & Live Sync
 with tab4:
     st.subheader("Manage Database & Cloud Sync")
-    if selected_row:
-        with st.form("add_sem_form"):
-            st.write(f"Appending Record for: **{sname}** ({sid})")
-            f_sem = st.selectbox("Semester", list(range(1, 9)))
-            f_ay = st.text_input("Academic Year (e.g. 2024-2025)", "2024-2025")
-            f_drop = st.checkbox("Mark as Drop / Gap Year")
-            f_sgpa = st.number_input("SGPA (0 - 10)", min_value=0.0, max_value=10.0, value=8.50)
-            f_cgpa = st.number_input("CGPA (0 - 10)", min_value=0.0, max_value=10.0, value=8.60)
+    
+    action_type = st.radio("Choose Target Action", [
+        "Register New Student", 
+        "Add Semester & Sync to Sheets",
+        "Add Portfolio Record"
+    ], horizontal=True)
 
-            st.markdown("---")
-            st.write("**Subject Marks (Theory / Lab)**")
-            f_code = st.text_input("Subject Code", "ECC501")
-            f_sname = st.text_input("Subject Name", "Digital Communication")
-            f_type = st.selectbox("Format", ["Theory", "Laboratory"])
-            f_int = st.number_input("Internal Score (0-20)", 0, 20, 18)
-            f_end = st.number_input("Endsem Score (0-80)", 0, 80, 68)
+    # Sub-action 1: Register New Student
+    if action_type == "Register New Student":
+        with st.form("register_student_form"):
+            st.markdown("##### 👤 Register New Student Profile")
+            new_sid = st.text_input("Student ID / Roll No (e.g. TE11K)")
+            new_name = st.text_input("Full Name")
+            new_email = st.text_input("Official Email Address")
+            new_adm = st.number_input("Batch Admission Year", min_value=2015, max_value=2030, value=2024)
+            new_ssc = st.number_input("SSC Final Aggregate %", min_value=0.0, max_value=100.0, value=85.0)
+            new_hsc = st.number_input("HSC Final Aggregate %", min_value=0.0, max_value=100.0, value=82.0)
+            
+            sub_student = st.form_submit_button("Commit New Student Profile")
+            if sub_student:
+                if not new_sid.strip() or not new_name.strip() or not new_email.strip():
+                    st.error("Please fill in Student ID, Full Name, and Email.")
+                else:
+                    try:
+                        c.execute("""
+                            INSERT INTO student_profiles (student_id, full_name, email_address, admission_year, ssc_score, hsc_score)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        """, (new_sid.strip(), new_name.strip(), new_email.strip(), new_adm, new_ssc, new_hsc))
+                        conn.commit()
+                        st.success(f"Student profile {new_name} ({new_sid}) registered successfully!")
+                        st.rerun()
+                    except sqlite3.IntegrityError as err:
+                        st.error(f"Database Constraint Error: {err}")
 
-            submitted = st.form_submit_button("Commit & Sync to Google Sheets")
-            if submitted:
-                try:
-                    c.execute("""
-                        INSERT INTO academic_semesters (student_id, semester_number, academic_year, is_drop_year, sgpa, cgpa)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    """, (sid, f_sem, f_ay, 1 if f_drop else 0, f_sgpa, f_cgpa))
-                    new_id = c.lastrowid
-                    status = "PASS" if (f_int + f_end) >= 40 else "FAIL"
-                    c.execute("""
-                        INSERT INTO subject_evaluations (sem_id, course_code, course_name, course_type, internal_score, endsem_score, status)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """, (new_id, f_code, f_sname, f_type, f_int, f_end, status))
-                    conn.commit()
+    # Sub-action 2: Add Semester & Sync
+    elif action_type == "Add Semester & Sync to Sheets":
+        if selected_row:
+            with st.form("add_sem_form"):
+                st.write(f"Appending Record for: **{sname}** ({sid})")
+                f_sem = st.selectbox("Semester", list(range(1, 9)))
+                f_ay = st.text_input("Academic Year (e.g. 2024-2025)", "2024-2025")
+                f_drop = st.checkbox("Mark as Drop / Gap Year")
+                f_sgpa = st.number_input("SGPA (0 - 10)", min_value=0.0, max_value=10.0, value=8.50)
+                f_cgpa = st.number_input("CGPA (0 - 10)", min_value=0.0, max_value=10.0, value=8.60)
 
-                    payload = {
-                        "action": "SEMESTER_COMMITTED",
-                        "student_id": sid,
-                        "name": sname,
-                        "academic_year": f_ay,
-                        "semester_number": f_sem,
-                        "sgpa": f_sgpa,
-                        "cgpa": f_cgpa,
-                        "is_drop_year": 1 if f_drop else 0
-                    }
-                    sync_to_google_sheets(payload)
-                    st.success("Record saved and synced to Google Spreadsheet!")
-                    st.rerun()
-                except Exception as err:
-                    st.error(f"Error: {err}")
+                st.markdown("---")
+                st.write("**Subject Marks (Theory / Lab)**")
+                f_code = st.text_input("Subject Code", "ECC501")
+                f_sname = st.text_input("Subject Name", "Digital Communication")
+                f_type = st.selectbox("Format", ["Theory", "Laboratory"])
+                f_int = st.number_input("Internal Score (0-20)", 0, 20, 18)
+                f_end = st.number_input("Endsem Score (0-80)", 0, 80, 68)
+
+                submitted = st.form_submit_button("Commit & Sync to Google Sheets")
+                if submitted:
+                    try:
+                        c.execute("""
+                            INSERT INTO academic_semesters (student_id, semester_number, academic_year, is_drop_year, sgpa, cgpa)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        """, (sid, f_sem, f_ay, 1 if f_drop else 0, f_sgpa, f_cgpa))
+                        new_id = c.lastrowid
+                        status = "PASS" if (f_int + f_end) >= 40 else "FAIL"
+                        c.execute("""
+                            INSERT INTO subject_evaluations (sem_id, course_code, course_name, course_type, internal_score, endsem_score, status)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """, (new_id, f_code, f_sname, f_type, f_int, f_end, status))
+                        conn.commit()
+
+                        payload = {
+                            "action": "SEMESTER_COMMITTED",
+                            "student_id": sid,
+                            "name": sname,
+                            "academic_year": f_ay,
+                            "semester_number": f_sem,
+                            "sgpa": f_sgpa,
+                            "cgpa": f_cgpa,
+                            "is_drop_year": 1 if f_drop else 0
+                        }
+                        sync_to_google_sheets(payload)
+                        st.success("Record saved and synced to Google Spreadsheet!")
+                        st.rerun()
+                    except Exception as err:
+                        st.error(f"Error: {err}")
+        else:
+            st.warning("Please select a student profile from the sidebar first.")
+
+    # Sub-action 3: Add Portfolio Record
+    elif action_type == "Add Portfolio Record":
+        if selected_row:
+            port_type = st.selectbox("Record Category", ["Seminar", "Activity / Competition"])
+            if port_type == "Seminar":
+                with st.form("add_sem_portfolio"):
+                    sem_title = st.text_input("Seminar Title")
+                    sem_tier = st.selectbox("Tier", ["Internal", "External"])
+                    sem_host = st.text_input("Host Institution")
+                    if st.form_submit_button("Save Seminar"):
+                        c.execute("INSERT INTO seminar_records (student_id, seminar_title, tier, host_institution) VALUES (?, ?, ?, ?)",
+                                  (sid, sem_title, sem_tier, sem_host))
+                        conn.commit()
+                        st.success("Seminar added successfully!")
+                        st.rerun()
+            else:
+                with st.form("add_act_portfolio"):
+                    act_name = st.text_input("Activity / Competition Name")
+                    act_domain = st.selectbox("Domain", ["Technical", "Co-curricular", "Extracurricular"])
+                    act_pos = st.text_input("Position / Standing", value="Winner")
+                    if st.form_submit_button("Save Activity"):
+                        c.execute("INSERT INTO activity_records (student_id, activity_name, domain, position_attained) VALUES (?, ?, ?, ?)",
+                                  (sid, act_name, act_domain, act_pos))
+                        conn.commit()
+                        st.success("Activity logged successfully!")
+                        st.rerun()
+        else:
+            st.warning("Please select a student profile from the sidebar first.")
 
 conn.close()
