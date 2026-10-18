@@ -182,32 +182,32 @@ with tab4:
     ], horizontal=True)
 
     # Sub-action 1: Register New Student
-    if action_type == "Register New Student":
-        with st.form("register_student_form"):
-            st.markdown("##### 👤 Register New Student Profile")
-            new_sid = st.text_input("Student ID / Roll No (e.g. TE11K)")
-            new_name = st.text_input("Full Name")
-            new_email = st.text_input("Official Email Address")
-            new_adm = st.number_input("Batch Admission Year", min_value=2015, max_value=2030, value=2024)
-            new_ssc = st.number_input("SSC Final Aggregate %", min_value=0.0, max_value=100.0, value=85.0)
-            new_hsc = st.number_input("HSC Final Aggregate %", min_value=0.0, max_value=100.0, value=82.0)
-            
-            sub_student = st.form_submit_button("Commit New Student Profile")
+sub_student = st.form_submit_button("Commit New Student Profile")
             if sub_student:
-                if not new_sid.strip() or not new_name.strip() or not new_email.strip():
+                clean_sid = new_sid.strip()
+                clean_name = new_name.strip()
+                clean_email = new_email.strip().lower()
+
+                if not clean_sid or not clean_name or not clean_email:
                     st.error("Please fill in Student ID, Full Name, and Email.")
                 else:
                     try:
-                        c.execute("""
-                            INSERT INTO student_profiles (student_id, full_name, email_address, admission_year, ssc_score, hsc_score)
-                            VALUES (?, ?, ?, ?, ?, ?)
-                        """, (new_sid.strip(), new_name.strip(), new_email.strip(), new_adm, new_ssc, new_hsc))
-                        conn.commit()
-                        st.success(f"Student profile {new_name} ({new_sid}) registered successfully!")
-                        st.rerun()
+                        # Check if email is already taken by a different student ID
+                        c.execute("SELECT student_id, full_name FROM student_profiles WHERE email_address = ?", (clean_email,))
+                        existing = c.fetchone()
+                        
+                        if existing and existing[0] != clean_sid:
+                            st.error(f"Email '{clean_email}' already belongs to {existing[1]} ({existing[0]}). Please enter a unique email.")
+                        else:
+                            c.execute("""
+                                INSERT OR REPLACE INTO student_profiles (student_id, full_name, email_address, admission_year, ssc_score, hsc_score)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                            """, (clean_sid, clean_name, clean_email, new_adm, new_ssc, new_hsc))
+                            conn.commit()
+                            st.success(f"Student profile {clean_name} ({clean_sid}) registered successfully!")
+                            st.rerun()
                     except sqlite3.IntegrityError as err:
                         st.error(f"Database Constraint Error: {err}")
-
     # Sub-action 2: Add Semester & Sync
     elif action_type == "Add Semester & Sync to Sheets":
         if selected_row:
