@@ -77,7 +77,6 @@ with tab1:
             drops = [r[5] for r in sem_records]
 
             fig = go.Figure()
-            # Standard Line
             fig.add_trace(go.Scatter(
                 x=sems, y=sgpas,
                 mode="lines+markers",
@@ -86,7 +85,6 @@ with tab1:
                 marker=dict(size=8)
             ))
 
-            # Drop Year Highlight
             drop_x = [sems[i] for i in range(len(sems)) if drops[i] == 1]
             drop_y = [sgpas[i] for i in range(len(sems)) if drops[i] == 1]
             if drop_x:
@@ -181,8 +179,17 @@ with tab4:
         "Add Portfolio Record"
     ], horizontal=True)
 
-    # Sub-action 1: Register New Student
-sub_student = st.form_submit_button("Commit New Student Profile")
+    if action_type == "Register New Student":
+        with st.form("register_student_form"):
+            st.markdown("##### 👤 Register New Student Profile")
+            new_sid = st.text_input("Student ID / Roll No (e.g. TE11K)")
+            new_name = st.text_input("Full Name")
+            new_email = st.text_input("Official Email Address")
+            new_adm = st.number_input("Batch Admission Year", min_value=2015, max_value=2030, value=2024)
+            new_ssc = st.number_input("SSC Final Aggregate %", min_value=0.0, max_value=100.0, value=85.0)
+            new_hsc = st.number_input("HSC Final Aggregate %", min_value=0.0, max_value=100.0, value=82.0)
+            
+            sub_student = st.form_submit_button("Commit New Student Profile")
             if sub_student:
                 clean_sid = new_sid.strip()
                 clean_name = new_name.strip()
@@ -192,7 +199,6 @@ sub_student = st.form_submit_button("Commit New Student Profile")
                     st.error("Please fill in Student ID, Full Name, and Email.")
                 else:
                     try:
-                        # Check if email is already taken by a different student ID
                         c.execute("SELECT student_id, full_name FROM student_profiles WHERE email_address = ?", (clean_email,))
                         existing = c.fetchone()
                         
@@ -208,7 +214,7 @@ sub_student = st.form_submit_button("Commit New Student Profile")
                             st.rerun()
                     except sqlite3.IntegrityError as err:
                         st.error(f"Database Constraint Error: {err}")
-    # Sub-action 2: Add Semester & Sync
+
     elif action_type == "Add Semester & Sync to Sheets":
         if selected_row:
             with st.form("add_sem_form"):
@@ -260,7 +266,6 @@ sub_student = st.form_submit_button("Commit New Student Profile")
         else:
             st.warning("Please select a student profile from the sidebar first.")
 
-    # Sub-action 3: Add Portfolio Record
     elif action_type == "Add Portfolio Record":
         if selected_row:
             port_type = st.selectbox("Record Category", ["Seminar", "Activity / Competition"])
