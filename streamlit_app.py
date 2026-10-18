@@ -3,6 +3,7 @@ import sqlite3
 import json
 import urllib.request
 import plotly.graph_objects as go
+import requests
 
 st.set_page_config(page_title="Academic Progression & Portfolio Tracker", layout="wide")
 
@@ -16,9 +17,8 @@ def get_connection():
 
 def sync_to_google_sheets(payload):
     try:
-        data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(WEBHOOK_URL, data=data, headers={"Content-Type": "application/json"})
-        urllib.request.urlopen(req, timeout=5)
+        res = requests.post(WEBHOOK_URL, json=payload, timeout=8)
+        print("Webhook Response:", res.status_code, res.text)
     except Exception as e:
         print("Webhook Error:", e)
 
